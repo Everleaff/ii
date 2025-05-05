@@ -1,0 +1,90 @@
+Описание задачи:
+Разработать систему, способную распознавать животных по фотографиям и предоставлять информацию о виде животного. Система должна быть реализована на Java и использовать методы искусственного интеллекта для классификации изображений.
+
+Пути решения:
+
+Сбор и подготовка данных: Собрать большой набор изображений различных видов животных с соответствующими метками (названия видов). Затем разделить полученный набор данных на обучающую и тестовую выборки.
+
+Выбор модели ИИ: Использовать нейронные сети, в частности свёрточные нейронные сети (CNN), которые эффективно решают задачи распознавания и классификации изображений. Выполнить обучение выбранной модели на собранных изображениях животных.
+
+Реализация на Java: Использовать библиотеку Deeplearning4j для создания CNN и OpenCV для обработки изображений. Разработать интерфейс, позволяющий загружать фотографии животных и выводить результат классификации.
+
+Тестирование и оптимизация: Провести оценку работы системы на тестовой выборке изображений животных, оптимизировать параметры сети и обработку изображений для улучшения точности распознавания.
+
+import org.deeplearning4j.nn.conf.NeuralNetConfiguration;
+import org.deeplearning4j.nn.conf.layers.ConvolutionLayer;
+import org.deeplearning4j.nn.conf.layers.DenseLayer;
+import org.deeplearning4j.nn.conf.layers.OutputLayer;
+import org.deeplearning4j.nn.conf.layers.SubsamplingLayer;
+import org.deeplearning4j.nn.multilayer.MultiLayerNetwork;
+import org.deeplearning4j.nn.weights.WeightInit;
+import org.nd4j.linalg.activations.Activation;
+import org.nd4j.linalg.api.ndarray.INDArray;
+import org.nd4j.linalg.factory.Nd4j;
+import org.nd4j.linalg.learning.config.Nesterovs;
+import org.nd4j.linalg.lossfunctions.LossFunctions;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+
+public class AnimalRecognition {
+    public static void main(String[] args) throws IOException {
+        // Загрузка изображения животного
+        BufferedImage image = ImageIO.read(new File("animal_image.jpg"));
+
+        // Преобразование изображения в INDArray
+        INDArray array = Nd4j.create(image.getHeight(), image.getWidth(), 3);
+        for (int i = 0; i < image.getHeight(); i++) {
+            for (int j = 0; j < image.getWidth(); j++) {
+                int rgb = image.getRGB(j, i);
+                array.putScalar(new int[]{i, j, 0}, (rgb >> 16) & 0xFF); // Red
+                array.putScalar(new int[]{i, j, 1}, (rgb >> 8) & 0xFF); // Green
+                array.putScalar(new int[]{i, j, 2}, rgb & 0xFF); // Blue
+            }
+        }
+
+        // Создание модели CNN для распознавания животных
+        MultiLayerNetwork model = new MultiLayerNetwork(new NeuralNetConfiguration.Builder()
+                .seed(42)
+                .weightInit(WeightInit.XAVIER)
+                .updater(new Nesterovs(0.01))
+                .list()
+                .layer(0, new ConvolutionLayer.Builder(5, 5)
+                        .nIn(3)
+                        .stride(1, 1)
+                        .nOut(32)
+                        .activation(Activation.RELU)
+                        .build())
+                .layer(1, new SubsamplingLayer.Builder(SubsamplingLayer.PoolingType.MAX)
+                        .kernelSize(2, 2)
+                        .stride(2, 2)
+                        .build())
+                .layer(2, new DenseLayer.Builder().nOut(128).activation(Activation.RELU).build())
+                .layer(3, new OutputLayer.Builder(LossFunctions.LossFunction.NEGATIVELOGLIKELIHOOD)
+                        .nOut(15) // Например, 15 классов животных
+                        .activation(Activation.SOFTMAX)
+                        .build())
+                .pretrain(false).backprop(true).build());
+
+        model.init();
+
+        // Обучение модели (необходим набор данных с животными)
+        // model.fit(dataset);
+
+        // Распознавание животного
+        INDArray output = model.output(array.reshape(1, image.getHeight(), image.getWidth(), 3));
+        int predictedClass = Nd4j.getBlasWrapper().iamax(output).getInt(0);
+
+        System.out.println("Распознанный класс животного: " + predictedClass);
+    }
+}
+
+В данной реализации:
+
+изображение животного загружается и преобразуется в формат, совместимый с нейронной сетью;
+
+создаётся CNN-модель, включающая свёрточный слой, пулинг, полносвязный и выходной слой;
+
+выполняется предсказание класса животного с помощью обученной модели. Для полноценной работы необходим предварительно обученный набор данных.
